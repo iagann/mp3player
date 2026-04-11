@@ -1,4 +1,6 @@
-﻿using LibVLCSharp.Shared;
+﻿//#define CRASH_TEST
+
+using LibVLCSharp.Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -63,8 +65,18 @@ namespace ObsMonolithPlayer
             string cachedPath = Path.Combine(cacheFolder, Title + ".mp4");
             if (File.Exists(cachedPath)) return cachedPath;
 
-            // Если файла нет — МГНОВЕННО СТРИМИМ из интернета
-            return await YtDlpHelper.GetDirectStreamUrlAsync($"https://youtube.com/watch?v={Id}");
+            string targetUrl = $"https://youtube.com/watch?v={Id}";
+
+#if CRASH_TEST
+        // Тестовый генератор хаоса: 50% шанс сломать ссылку для проверки логики
+        if (new Random().Next(100) < 50)
+        {
+            targetUrl = "https://youtube.com/watch?v=broken_id_test_123";
+            System.Diagnostics.Debug.WriteLine($"[TEST] URL искусственно поврежден: {targetUrl}");
+        }
+#endif
+
+            return await YtDlpHelper.GetDirectStreamUrlAsync(targetUrl);
         }
     }
     public partial class MainWindow : Window
@@ -271,9 +283,19 @@ namespace ObsMonolithPlayer
             // Защита от удаленных видео
             if (string.IsNullOrEmpty(mediaUri))
             {
-                txtCurrentTrack.Text = "❌ Видео недоступно";
-                await Task.Delay(2000);
-                PlayNext();
+                Dispatcher.Invoke(() => {
+                    txtCurrentTrack.Text = "❌ Ошибка потока. ▶ для повтора";
+                    txtCurrentTrack.Foreground = Brushes.LightCoral;
+
+                    // Очищаем медиа, чтобы функция TogglePlay поняла, что нужно сделать Retry
+                    _mediaPlayer.Media = null;
+
+                    // Переводим интерфейс в состояние "Пауза"
+                    UpdatePlayPauseUI(false);
+                    UpdateTaskbarIcon(false);
+                });
+
+                // Прерываем выполнение метода. Плеер ждет твоих действий (Play, Next или Prev).
                 return;
             }
 
@@ -312,6 +334,7 @@ namespace ObsMonolithPlayer
         private void StartMarqueeAnimation()
         {
             // Очистка старой анимации
+            txtCurrentTrack.Foreground = Brushes.White;
             textTransform.BeginAnimation(TranslateTransform.XProperty, null);
             textTransform.X = 0;
 
@@ -406,13 +429,21 @@ namespace ObsMonolithPlayer
             if (_mediaPlayer.IsPlaying)
             {
                 _mediaPlayer.Pause();
-                UpdateTaskbarIcon(false); // Явно говорим: теперь пауза
+                UpdateTaskbarIcon(false);
                 UpdatePlayPauseUI(false);
             }
             else
             {
+                // РАСЧЕТ РИСКОВ: Если медиа пустое (из-за ошибки yt-dlp), 
+                // кнопка Play работает как "Повторить попытку" для текущего трека.
+                if (_mediaPlayer.Media == null && _playlistIndex >= 0 && _playlistIndex < _sessionPlaylist.Count)
+                {
+                    PlayTrack(_sessionPlaylist[_playlistIndex]);
+                    return;
+                }
+
                 _mediaPlayer.Play();
-                UpdateTaskbarIcon(true); // Явно говорим: теперь играем
+                UpdateTaskbarIcon(true);
                 UpdatePlayPauseUI(true);
             }
         }
