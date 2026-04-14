@@ -6,8 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
-  </PropertyGroup>
+    <ApplicationIcon>icon.ico</ApplicationIcon>	
+	<PublishReadyToRun>true</PublishReadyToRun>
+	<TieredCompilation>true</TieredCompilation>
+  </PropertyGroup>	
 
   <ItemGroup>
     <Content Include="icon.ico" />

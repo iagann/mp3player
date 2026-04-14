@@ -95,7 +95,7 @@ namespace ObsMonolithPlayer
         private int _playlistIndex = -1;
 
         private string _libraryPath = @"C:\Users\vladh\OneDrive\OneDrive\музыка на случай Роскомнадзорпокалипсиса";
-        private string _cacheFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "VideoCache");
+        private string _cacheFolder = @"C:\Users\vladh\Desktop\twitch\mp3player\VideoCache";
 
         // Внутри класса:
         [DllImport("user32.dll")]
@@ -333,49 +333,46 @@ namespace ObsMonolithPlayer
 
         private void StartMarqueeAnimation()
         {
-            // Очистка старой анимации
-            txtCurrentTrack.Foreground = Brushes.White;
+            // 1. Полный сброс
             textTransform.BeginAnimation(TranslateTransform.XProperty, null);
             textTransform.X = 0;
+            txtCurrentTrack.Foreground = Brushes.White;
 
-            // Возвращаем центр для замера (важно для коротких треков)
-            txtCurrentTrack.HorizontalAlignment = HorizontalAlignment.Center;
-
-            // Ждем обновления макета для точных расчетов
+            // Ждем, когда WPF прогрузит текст в элемент
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                // Ссылаемся на borderTitle вместо canvTitle
-                double containerWidth = borderTitle.ActualWidth;
-                double textWidth = txtCurrentTrack.ActualWidth;
+                double containerWidth = gridTitle.ActualWidth;
+
+                // 2. РАСЧЕТ РЕАЛЬНОЙ ШИРИНЫ (Ignore constraints)
+                txtCurrentTrack.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double textWidth = txtCurrentTrack.DesiredSize.Width;
 
                 if (textWidth > containerWidth)
                 {
-                    // Текст длинный: переключаем на левый край, чтобы было откуда крутить
-                    txtCurrentTrack.HorizontalAlignment = HorizontalAlignment.Left;
+                    // Текст длинный: прижимаем к левому краю и запускаем цикл
+                    Canvas.SetLeft(txtCurrentTrack, 0);
 
                     double diff = textWidth - containerWidth;
-                    // Скорость прокрутки: чем длиннее текст, тем дольше анимация
-                    double duration = diff * 0.05 + 2;
+                    double duration = diff * 0.04 + 2.5; // Чуть более плавная скорость
 
                     DoubleAnimation marqueeAnim = new DoubleAnimation
                     {
-                        From = 0,
-                        To = -(diff + 30), // Запас 30 пикселей, чтобы увидеть конец названия
+                        From = 10, // Небольшой отступ в начале для красоты
+                        To = -(diff + 40), // Уходим за край + запас
                         Duration = TimeSpan.FromSeconds(duration),
                         RepeatBehavior = RepeatBehavior.Forever,
                         AutoReverse = true,
-                        BeginTime = TimeSpan.FromSeconds(1.5) // Пауза в 1.5 сек перед стартом
+                        BeginTime = TimeSpan.FromSeconds(2) // Даем 2 сек прочитать начало
                     };
 
-                    // Добавляем плавность в начале и конце
                     marqueeAnim.EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut };
-
                     textTransform.BeginAnimation(TranslateTransform.XProperty, marqueeAnim);
                 }
                 else
                 {
-                    // Текст короткий: просто центрируем
-                    txtCurrentTrack.HorizontalAlignment = HorizontalAlignment.Center;
+                    // Текст короткий: центрируем его внутри Canvas вручную
+                    double centerPos = (containerWidth - textWidth) / 2;
+                    Canvas.SetLeft(txtCurrentTrack, centerPos);
                 }
             }), System.Windows.Threading.DispatcherPriority.Loaded);
         }

@@ -148,20 +148,22 @@
                         Margin="0,2"
                         Background="#261A1A1A">
 
-                        <Grid x:Name="gridTitle">
-                            <TextBlock x:Name="txtCurrentTrack" 
-                                   HorizontalAlignment="Center"
+                        <Grid x:Name="gridTitle" ClipToBounds="True">
+                            <Canvas x:Name="canvasTitle" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <TextBlock x:Name="txtCurrentTrack" 
+                                   Canvas.Left="0" 
                                    VerticalAlignment="Center"
                                    FontSize="18" 
                                    FontWeight="Bold" 
                                    Foreground="White"
                                    Cursor="Hand" 
                                    MouseLeftButtonDown="txtCurrentTrack_MouseLeftButtonDown"
-                                   ToolTip="Нажмите, чтобы скопировать название">
-                                <TextBlock.RenderTransform>
-                                    <TranslateTransform x:Name="textTransform" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                                   TextOptions.TextRenderingMode="ClearType">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="textTransform" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Canvas>
                         </Grid>
                     </Border>
 
