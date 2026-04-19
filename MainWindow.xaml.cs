@@ -763,14 +763,9 @@ namespace ObsMonolithPlayer
         }
         private async Task<(string id, string title)?> GetYouTubeVideoInfoAsync(string url)
         {
-            if (!YtDlpHelper.IsValidYouTubeUrl(url))
-            {
-                System.Diagnostics.Debug.WriteLine($"[API] Отклонено: Некорректный URL - {url}");
-                return null;
-            }
+            if (!YtDlpHelper.IsValidYouTubeUrl(url)) return null;
 
-            // Явно указываем возвращаемый тип для Task.Run, чтобы разрешить возврат null
-            return await Task.Run<(string id, string title)?>(() =>
+            return await Task.Run<(string id, string title)?>(async () =>
             {
                 try
                 {
@@ -779,32 +774,49 @@ namespace ObsMonolithPlayer
                         process.StartInfo = new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = "yt-dlp",
-                            Arguments = $"--get-title --get-id --no-playlist \"{url}\"",
+                            // --dump-json выплевывает одну строку со всеми данными видео
+                            Arguments = $"--dump-json --no-playlist \"{url}\"",
                             RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            StandardOutputEncoding = System.Text.Encoding.UTF8,
                             UseShellExecute = false,
                             CreateNoWindow = true
                         };
+
+                        // Принудительно выставляем UTF-8 для Python
+                        process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
                         process.Start();
 
-                        // Читаем все строки (обычно их две: заголовок и ID)
-                        string title = process.StandardOutput.ReadLine()?.Trim();
-                        string id = process.StandardOutput.ReadLine()?.Trim();
-                        process.WaitForExit();
+                        string output = await process.StandardOutput.ReadToEndAsync();
+                        await process.WaitForExitAsync();
 
-                        if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(title))
+                        if (!string.IsNullOrWhiteSpace(output))
                         {
-                            return (id, title);
+                            // Используем встроенный парсер .NET
+                            using (var doc = System.Text.Json.JsonDocument.Parse(output))
+                            {
+                                var root = doc.RootElement;
+
+                                // Извлекаем данные по ключам. Это гораздо надежнее, чем ReadLine
+                                string id = root.GetProperty("id").GetString();
+                                string title = root.GetProperty("title").GetString();
+
+                                // Если название всё же пустое (крайний случай), подменяем на ID
+                                if (string.IsNullOrWhiteSpace(title)) title = $"Video {id}";
+
+                                return (id, title);
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Ошибка yt-dlp: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[JSON Error]: {ex.Message}");
                 }
-                return null; // Теперь null допустим, так как тип кортежа - (string, string)?
+                return null;
             });
         }
-
         private async void ProcessTrackOrder(string url, string username)
         {
             string originalTitle = txtCurrentTrack.Text;
